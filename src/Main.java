@@ -1,9 +1,9 @@
 // Main.java
 //
-// PHASE 3 TEST VERSION.
-// Reads a .pcap file, parses Ethernet/IP/TCP headers, and for any
-// TCP traffic on port 443, tries to extract the SNI (domain name)
-// from the TLS Client Hello.
+// PHASE 4 TEST VERSION.
+// Now uses FlowTracker to "remember" SNI/app-type per connection,
+// so every packet on a flow gets tagged correctly - not just the
+// first packet where SNI was actually found.
 
 import java.io.IOException;
 
@@ -18,7 +18,8 @@ public class Main {
         String filename = args[0];
         int totalPackets = 0;
         int parsedPackets = 0;
-        int sniFound = 0;
+
+        FlowTracker tracker = new FlowTracker();
 
         try (PcapReader reader = new PcapReader(filename)) {
 
@@ -35,24 +36,45 @@ public class Main {
                 }
                 parsedPackets++;
 
-                String line = "Packet #" + totalPackets + ": " + parsed;
+                // Build the five-tuple "fingerprint" for this packet's connection
+                FiveTuple key = new FiveTuple(
+                        Integer.toUnsignedLong(parsed.srcIp),
+                        Integer.toUnsignedLong(parsed.dstIp),
+                        parsed.srcPort,
+                        parsed.dstPort,
+                        parsed.isTcp ? 6 : 17);
 
-                // Only bother checking for SNI on traffic headed to port 443 (HTTPS)
-                if (parsed.isTcp && parsed.dstPort == 443) {
+                // Look up (or create) the Flow for this connection
+                Flow flow = tracker.getOrCreateFlow(key);
+                flow.packetCount++;
+
+                // Only try extracting SNI if we don't already know it for this flow -
+                // saves work, and avoids re-parsing payloads that won't have SNI anyway
+                // (SNI only appears once, in the Client Hello).
+                if (flow.sni == null && parsed.isTcp && parsed.dstPort == 443) {
                     String hostname = SniExtractor.extract(parsed.payload);
                     if (hostname != null) {
-                        sniFound++;
-                        line += "  >>> SNI found: " + hostname;
+                        tracker.recordSni(flow, hostname);
                     }
                 }
 
+                String line = "Packet #" + totalPackets + ": " + parsed;
+                if (flow.sni != null) {
+                    line += "  [flow: " + flow.sni + " / " + flow.appType + "]";
+                }
                 System.out.println(line);
             }
 
             System.out.println("----------------------------------------");
             System.out.println("Total packets read: " + totalPackets);
             System.out.println("Successfully parsed: " + parsedPackets);
-            System.out.println("SNI domains found: " + sniFound);
+            System.out.println("Distinct flows tracked: " + tracker.getFlowCount());
+
+            System.out.println("----------------------------------------");
+            System.out.println("Flow summary:");
+            for (Flow f : tracker.getAllFlows().values()) {
+                System.out.println("  " + f);
+            }
 
         } catch (IOException e) {
             System.out.println("Error reading pcap file: " + e.getMessage());
