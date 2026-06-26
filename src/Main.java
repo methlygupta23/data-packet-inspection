@@ -1,8 +1,9 @@
 // Main.java
 //
-// PHASE 2 TEST VERSION.
-// Reads a .pcap file, parses each packet's Ethernet/IP/TCP headers,
-// and prints the source/destination IP:port for each one.
+// PHASE 3 TEST VERSION.
+// Reads a .pcap file, parses Ethernet/IP/TCP headers, and for any
+// TCP traffic on port 443, tries to extract the SNI (domain name)
+// from the TLS Client Hello.
 
 import java.io.IOException;
 
@@ -17,11 +18,11 @@ public class Main {
         String filename = args[0];
         int totalPackets = 0;
         int parsedPackets = 0;
+        int sniFound = 0;
 
         try (PcapReader reader = new PcapReader(filename)) {
 
             System.out.println("Opened file: " + filename);
-            System.out.println("Link type: " + reader.getLinkType() + " (1 = Ethernet)");
             System.out.println("----------------------------------------");
 
             RawPacket raw;
@@ -30,17 +31,28 @@ public class Main {
 
                 ParsedPacket parsed = PacketParser.parse(raw);
                 if (parsed == null) {
-                    System.out.println("Packet #" + totalPackets + ": skipped (not IPv4 TCP/UDP)");
                     continue;
                 }
-
                 parsedPackets++;
-                System.out.println("Packet #" + totalPackets + ": " + parsed);
+
+                String line = "Packet #" + totalPackets + ": " + parsed;
+
+                // Only bother checking for SNI on traffic headed to port 443 (HTTPS)
+                if (parsed.isTcp && parsed.dstPort == 443) {
+                    String hostname = SniExtractor.extract(parsed.payload);
+                    if (hostname != null) {
+                        sniFound++;
+                        line += "  >>> SNI found: " + hostname;
+                    }
+                }
+
+                System.out.println(line);
             }
 
             System.out.println("----------------------------------------");
             System.out.println("Total packets read: " + totalPackets);
             System.out.println("Successfully parsed: " + parsedPackets);
+            System.out.println("SNI domains found: " + sniFound);
 
         } catch (IOException e) {
             System.out.println("Error reading pcap file: " + e.getMessage());
