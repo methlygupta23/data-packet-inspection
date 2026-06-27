@@ -21,11 +21,19 @@ import java.util.Map;
 
 public class FlowTracker {
 
+    // NOTE on thread-safety (Phase 8):
+    // Multiple worker threads can call getOrCreateFlow() and recordSni()
+    // AT THE SAME TIME, for different packets. Since they all share this
+    // one HashMap, we mark these methods `synchronized` - meaning only
+    // ONE thread can be running the synchronized code at any instant.
+    // Other threads calling it simply wait their turn (briefly).
+    // This is the simplest correct fix; Phase 9 improves on this by
+    // giving each worker its own private map instead of sharing one.
     private final Map<FiveTuple, Flow> flows = new HashMap<>();
 
     // Looks up the Flow for this five-tuple. If we've never seen this
     // connection before, creates a brand new Flow and stores it.
-    public Flow getOrCreateFlow(FiveTuple key) {
+    public synchronized Flow getOrCreateFlow(FiveTuple key) {
         Flow flow = flows.get(key);
         if (flow == null) {
             flow = new Flow(key);
@@ -36,7 +44,7 @@ public class FlowTracker {
 
     // Call this once we've successfully extracted an SNI for a flow.
     // Also classifies the app type based on the hostname.
-    public void recordSni(Flow flow, String hostname) {
+    public synchronized void recordSni(Flow flow, String hostname) {
         flow.sni = hostname;
         flow.appType = classifyAppType(hostname);
     }
@@ -72,11 +80,11 @@ public class FlowTracker {
     }
 
     // Useful for Phase 6 (reporting) - gives access to every tracked flow.
-    public Map<FiveTuple, Flow> getAllFlows() {
+    public synchronized Map<FiveTuple, Flow> getAllFlows() {
         return flows;
     }
 
-    public int getFlowCount() {
+    public synchronized int getFlowCount() {
         return flows.size();
     }
 }
