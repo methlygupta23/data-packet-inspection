@@ -42,6 +42,14 @@ public class WorkerThread extends Thread {
             }
 
             if (pkt instanceof PoisonPill) {
+                // IMPORTANT: forward the poison pill onward to the Writer thread too!
+                // If we just `break` here without forwarding, the Writer will wait
+                // forever for a poison pill that never arrives - this caused a hang.
+                try {
+                    outputQueue.put(pkt);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
                 break; // this worker is done - no more packets coming
             }
 
@@ -78,18 +86,39 @@ public class WorkerThread extends Thread {
                 parsed.isTcp ? 6 : 17);
 
         Flow flow = tracker.getOrCreateFlow(key); // thread-safe (synchronized inside)
-        flow.packetCount++;
 
-        if (flow.sni == null && parsed.isTcp && parsed.dstPort == 443) {
-            String hostname = SniExtractor.extract(parsed.payload);
-            if (hostname != null) {
-                tracker.recordSni(flow, hostname); // thread-safe (synchronized inside)
-                if (rules.shouldBlock(flow)) {
-                    flow.blocked = true;
+        // CRITICAL: everything that reads or writes fields ON this specific
+        // Flow object (packetCount, sni, blocked) must be synchronized on
+        // that Flow - otherwise two worker threads handling two different
+        // packets of the SAME connection can race each other. This caused
+        // a real bug during testing: one thread would check `flow.blocked`
+        // a split second before another thread finished setting it to true,
+        // letting a packet through that should have been dropped.
+        synchronized (flow) {
+            flow.packetCount++;
+
+            if (flow.sni == null && parsed.isTcp && parsed.dstPort == 443) {
+                String hostname = SniExtractor.extract(parsed.payload);
+                if (hostname != null) {
+                    // Set the flow's fields directly instead of calling
+                    // tracker.recordSni() here - that method is itself
+                    // `synchronized` on the FlowTracker, and calling it
+                    // while we're already holding this flow's lock means
+                    // we'd be holding TWO locks at once, in a fixed order
+                    // (flow -> tracker). If any other code path ever
+                    // acquired those same two locks in the OPPOSITE order
+                    // (tracker -> flow), that's a classic deadlock - two
+                    // threads each holding one lock, waiting for the other's.
+                    // We avoid the whole problem by never nesting locks here.
+                    flow.sni = hostname;
+                    flow.appType = FlowTracker.classifyAppType(hostname);
+                    if (rules.shouldBlock(flow)) {
+                        flow.blocked = true;
+                    }
                 }
             }
-        }
 
-        pkt.blocked = flow.blocked;
+            pkt.blocked = flow.blocked;
+        }
     }
 }

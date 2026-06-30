@@ -1,13 +1,15 @@
 // ReaderThread.java
 //
 // Runs as its own thread. Its ONLY job: open the input .pcap file,
-// read every packet, and push each one (wrapped as a Packet) into
-// the input queue for worker threads to pick up.
+// read every packet, and push each one into a single queue for the
+// LoadBalancerThread to pick up.
 //
-// Reading from disk is inherently sequential (we can't read a single
-// file in parallel), so this stays as ONE thread - but it can run
-// WHILE worker threads are simultaneously processing earlier packets,
-// which is the whole point of splitting this into a pipeline.
+// NOTE (Phase 9 change): this used to ALSO hash packets and route them
+// directly to worker queues (Phase 8). We've now split that hashing
+// responsibility out into its own LoadBalancerThread, so this class
+// goes back to doing just ONE job: reading bytes from disk as fast as
+// possible. This means slow disk I/O and CPU-bound hashing no longer
+// compete for the same thread's time.
 
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
@@ -16,13 +18,11 @@ public class ReaderThread extends Thread {
 
     private final String inputFile;
     private final BlockingQueue<Packet> outputQueue;
-    private final int numWorkers; // how many poison pills to send when done
 
-    public ReaderThread(String inputFile, BlockingQueue<Packet> outputQueue, int numWorkers) {
+    public ReaderThread(String inputFile, BlockingQueue<Packet> outputQueue) {
         super("Reader-Thread");
         this.inputFile = inputFile;
         this.outputQueue = outputQueue;
-        this.numWorkers = numWorkers;
     }
 
     @Override
@@ -32,8 +32,7 @@ public class ReaderThread extends Thread {
 
             RawPacket raw;
             while ((raw = reader.readNextPacket()) != null) {
-                Packet pkt = new Packet(raw);
-                outputQueue.put(pkt); // blocks if queue is full - applies natural backpressure
+                outputQueue.put(new Packet(raw)); // blocks if queue is full
                 count++;
             }
 
@@ -43,13 +42,10 @@ public class ReaderThread extends Thread {
             Thread.currentThread().interrupt();
         }
 
-        // Send one poison pill PER WORKER, so every worker thread knows to stop.
-        // (If we only sent one, only one worker would see it and stop - the
-        // others would wait forever on queue.take().)
+        // Only ONE poison pill needed now - there's only ONE LoadBalancerThread
+        // consuming this queue (unlike Phase 8, where every worker needed one).
         try {
-            for (int i = 0; i < numWorkers; i++) {
-                outputQueue.put(PoisonPill.INSTANCE);
-            }
+            outputQueue.put(PoisonPill.INSTANCE);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

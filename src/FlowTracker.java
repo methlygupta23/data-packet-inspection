@@ -42,17 +42,12 @@ public class FlowTracker {
         return flow;
     }
 
-    // Call this once we've successfully extracted an SNI for a flow.
-    // Also classifies the app type based on the hostname.
-    public synchronized void recordSni(Flow flow, String hostname) {
-        flow.sni = hostname;
-        flow.appType = classifyAppType(hostname);
-    }
-
-    // Very simple classifier: checks if known app names appear as a
-    // substring of the hostname. Good enough for common cases like
-    // "www.youtube.com" or "m.facebook.com".
-    private AppType classifyAppType(String hostname) {
+    // classifyAppType doesn't touch the shared HashMap at all - it's pure
+    // logic on a hostname string - so it's `static` and does NOT need to
+    // be synchronized. This also means WorkerThread can call it directly
+    // while already holding a Flow's lock, without any risk of acquiring
+    // two locks in conflicting order (the deadlock we hit and fixed).
+    public static AppType classifyAppType(String hostname) {
         String h = hostname.toLowerCase();
 
         if (h.contains("youtube") || h.contains("ytimg") || h.contains("googlevideo")) {
