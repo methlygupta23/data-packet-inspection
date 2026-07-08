@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java DPI Engine - Animated Visual Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-glow"></div>
+                <i data-lucide="shield-alert" class="header-icon"></i>
+                <div class="title-meta">
+                    <h1>Java DPI Engine</h1>
+                    <p>Multi-threaded Deep Packet Inspection Simulator</p>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-bubble">
+                    <span class="bubble-label">Status</span>
+                    <span class="bubble-val status-active">
+                        <span class="pulse-dot"></span>Running
+                    </span>
+                </div>
+                <div class="stat-bubble">
+                    <span class="bubble-label">Speed</span>
+                    <span class="bubble-val" id="speed-badge">1.0x</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <main class="app-content">
+            
+            <!-- LEFT PANEL: CONTROLS & INSPECTOR -->
+            <section class="left-panel">
+                
+                <!-- CONTROL CARD -->
+                <div class="card glass-card shadow-premium" id="control-card">
+                    <div class="card-header">
+                        <i data-lucide="sliders"></i>
+                        <h2>Engine Configuration</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Simulation Controls -->
+                        <div class="simulation-actions">
+                            <button id="btn-play-pause" class="btn btn-primary" title="Start/Pause Simulation">
+                                <i data-lucide="play" id="play-icon"></i>
+                                <span id="play-text">Start Simulation</span>
+                            </button>
+                            <button id="btn-reset" class="btn btn-secondary" title="Reset Statistics & Simulation">
+                                <i data-lucide="rotate-ccw"></i>
+                            </button>
+                            <button id="btn-inject-random" class="btn btn-accent" title="Inject Random Packet">
+                                <i data-lucide="zap"></i>
+                                <span>Inject Packet</span>
+                            </button>
+                        </div>
+
+                        <!-- Workers Slider -->
+                        <div class="form-group">
+                            <div class="group-label">
+                                <span>Worker Threads (N)</span>
+                                <span class="badge badge-teal" id="workers-val">4</span>
+                            </div>
+                            <input type="range" id="workers-slider" min="1" max="8" value="4" step="1" class="slider">
+                            <div class="slider-ticks">
+                                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                            </div>
+                            <small class="help-text">Controls the load balancer hashing target count and concurrent processing threads.</small>
+                        </div>
+
+                        <!-- Speed Slider -->
+                        <div class="form-group">
+                            <div class="group-label">
+                                <span>Simulation Speed</span>
+                                <span id="speed-label">Normal</span>
+                            </div>
+                            <input type="range" id="speed-slider" min="0.1" max="3" value="1" step="0.1" class="slider">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RULE MANAGER CARD -->
+                <div class="card glass-card shadow-premium" id="rules-card">
+                    <div class="card-header">
+                        <i data-lucide="shield-x"></i>
+                        <h2>DPI Rule Engine</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Add Rule Tabs -->
+                        <div class="rule-inputs">
+                            <div class="input-row">
+                                <input type="text" id="rule-domain" placeholder="Block domain (e.g. facebook)" class="input-text">
+                                <button id="btn-add-domain" class="btn btn-small" title="Add domain block rule">Block</button>
+                            </div>
+                            <div class="input-row">
+                                <input type="text" id="rule-ip" placeholder="Block IP (e.g. 8.8.8.8)" class="input-text">
+                                <button id="btn-add-ip" class="btn btn-small" title="Add IP block rule">Block</button>
+                            </div>
+                        </div>
+
+                        <!-- App Category Rules -->
+                        <div class="app-categories-grid">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="block-youtube" class="block-app-checkbox" data-app="YOUTUBE">
+                                <span class="checkbox-label">Youtube</span>
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="block-facebook" class="block-app-checkbox" data-app="FACEBOOK">
+                                <span class="checkbox-label">Facebook</span>
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="block-tiktok" class="block-app-checkbox" data-app="TIKTOK">
+                                <span class="checkbox-label">TikTok</span>
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="block-instagram" class="block-app-checkbox" data-app="INSTAGRAM">
+                                <span class="checkbox-label">Instagram</span>
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="block-netflix" class="block-app-checkbox" data-app="NETFLIX">
+                                <span class="checkbox-label">Netflix</span>
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="block-github" class="block-app-checkbox" data-app="GITHUB">
+                                <span class="checkbox-label">GitHub</span>
+                            </label>
+                        </div>
+
+                        <!-- Rules List -->
+                        <div class="rules-list-container">
+                            <div class="list-title">Active Rules:</div>
+                            <ul id="active-rules" class="rules-list">
+                                <!-- Rules dynamically added here -->
+                                <li class="empty-rules">No blocking rules active. All traffic allowed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PACKET DECODER CARD -->
+                <div class="card glass-card shadow-premium" id="decoder-card">
+                    <div class="card-header">
+                        <i data-lucide="binary"></i>
+                        <h2>Deep Packet Inspector</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Presets Selector -->
+                        <div class="form-group select-group">
+                            <label for="packet-presets">Select Packet Capture Template:</label>
+                            <div class="select-wrapper">
+                                <select id="packet-presets">
+                                    <option value="youtube">HTTPS TLS Client Hello (youtube.com)</option>
+                                    <option value="github">HTTPS TLS Client Hello (github.com)</option>
+                                    <option value="http">Plain HTTP GET Request (no TLS)</option>
+                                    <option value="dns">DNS Request (UDP Port 53)</option>
+                                    <option value="ipv6">Unsupported IPv6 Packet (EtherType 0x86DD)</option>
+                                    <option value="malformed">Malformed Short Packet (&lt; 14 bytes)</option>
+                                </select>
+                                <i data-lucide="chevron-down" class="select-arrow"></i>
+                            </div>
+                        </div>
+
+                        <div class="inspector-action-row">
+                            <button id="btn-inject-preset" class="btn btn-accent btn-full">
+                                <i data-lucide="arrow-right-circle"></i>
+                                <span>Inject Selected Template into Pipeline</span>
+                            </button>
+                        </div>
+
+                        <!-- Hex Viewer -->
+                        <div class="hex-viewer-container">
+                            <div class="hex-header">
+                                <span>HEX DUMP</span>
+                                <span class="hex-hover-legend" id="hex-hover-info">Hover bytes to inspect headers</span>
+                            </div>
+                            <div id="hex-grid" class="hex-grid scrollbar-styled">
+                                <!-- Generated Dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Decode Breakdown -->
+                        <div class="decode-breakdown scrollbar-styled" id="decode-details">
+                            <!-- Generated Dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- RIGHT PANEL: SIMULATION & STATISTICS -->
+            <section class="right-panel">
+                
+                <!-- PIPELINE SIMULATION WINDOW -->
+                <div class="card glass-card pipeline-card shadow-premium">
+                    <div class="card-header">
+                        <i data-lucide="git-branch" class="header-icon-orange"></i>
+                        <h2>DPI Engine Pipeline Simulator</h2>
+                        <span class="pipeline-help">Hover over queues and threads for details</span>
+                    </div>
+                    <div class="card-body pipeline-canvas-container">
+                        <!-- Canvas / SVG Animation Area -->
+                        <div class="svg-viewport" id="svg-container">
+                            <!-- SVG elements will be generated dynamically by JS -->
+                            <svg id="pipeline-svg" width="100%" height="450">
+                                <defs>
+                                    <!-- Gradients -->
+                                    <linearGradient id="grad-allowed" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="var(--color-teal)" stop-opacity="0.2"/>
+                                        <stop offset="100%" stop-color="var(--color-teal)" stop-opacity="0.8"/>
+                                    </linearGradient>
+                                    <linearGradient id="grad-dropped" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="var(--color-red)" stop-opacity="0.2"/>
+                                        <stop offset="100%" stop-color="var(--color-red)" stop-opacity="0.8"/>
+                                    </linearGradient>
+                                    <linearGradient id="grad-neutral" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="var(--color-cyan)" stop-opacity="0.1"/>
+                                        <stop offset="100%" stop-color="var(--color-cyan)" stop-opacity="0.4"/>
+                                    </linearGradient>
+                                    <!-- Glow Filter -->
+                                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                                        <feGaussianBlur stdDeviation="5" result="blur" />
+                                        <feMerge>
+                                            <feMergeNode in="blur" />
+                                            <feMergeNode in="SourceGraphic" />
+                                        </feMerge>
+                                    </filter>
+                                </defs>
+                                <!-- Connection Lines -->
+                                <g id="connections-group"></g>
+                                <!-- Flowing Packets -->
+                                <g id="packets-group"></g>
+                                <!-- Pipeline Nodes -->
+                                <g id="nodes-group"></g>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIVE METRICS & STATISTICS -->
+                <div class="metrics-grid">
+                    
+                    <!-- SUMMARY STATS -->
+                    <div class="card glass-card stat-card border-left-teal">
+                        <div class="stat-content">
+                            <span class="stat-title">Total Processed</span>
+                            <span class="stat-value text-glow-teal" id="stat-total">0</span>
+                        </div>
+                        <div class="stat-icon-wrapper bg-teal-opacity">
+                            <i data-lucide="package" class="icon-teal"></i>
+                        </div>
+                    </div>
+
+                    <div class="card glass-card stat-card border-left-green">
+                        <div class="stat-content">
+                            <span class="stat-title">Forwarded (Allowed)</span>
+                            <span class="stat-value text-glow-green" id="stat-allowed">0</span>
+                            <span class="stat-pct" id="pct-allowed">0%</span>
+                        </div>
+                        <div class="stat-icon-wrapper bg-green-opacity">
+                            <i data-lucide="check-circle" class="icon-green"></i>
+                        </div>
+                    </div>
+
+                    <div class="card glass-card stat-card border-left-red">
+                        <div class="stat-content">
+                            <span class="stat-title">Dropped (Blocked)</span>
+                            <span class="stat-value text-glow-red" id="stat-dropped">0</span>
+                            <span class="stat-pct" id="pct-dropped">0%</span>
+                        </div>
+                        <div class="stat-icon-wrapper bg-red-opacity">
+                            <i data-lucide="x-circle" class="icon-red"></i>
+                        </div>
+                    </div>
+
+                    <div class="card glass-card stat-card border-left-orange">
+                        <div class="stat-content">
+                            <span class="stat-title">Engine Throughput</span>
+                            <span class="stat-value text-glow-orange" id="stat-rate">0 p/s</span>
+                        </div>
+                        <div class="stat-icon-wrapper bg-orange-opacity">
+                            <i data-lucide="activity" class="icon-orange"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DETAILED WORKERS LOAD & APP DISTRIBUTION -->
+                <div class="details-row">
+                    
+                    <!-- WORKERS LOAD LIST -->
+                    <div class="card glass-card flex-2">
+                        <div class="card-header">
+                            <i data-lucide="cpu"></i>
+                            <h2>Worker Threads Active State</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="workers-load-list" id="workers-load-container">
+                                <!-- Populated Dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- APP CLASSIFICATION DISTRIBUTION -->
+                    <div class="card glass-card flex-1">
+                        <div class="card-header">
+                            <i data-lucide="pie-chart"></i>
+                            <h2>App Classification</h2>
+                        </div>
+                        <div class="card-body app-dist-body">
+                            <div class="app-dist-container" id="app-dist-container">
+                                <!-- Populated Dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Script File -->
+    <script src="app.js"></script>
+</body>
+</html>
